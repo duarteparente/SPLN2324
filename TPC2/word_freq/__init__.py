@@ -23,10 +23,9 @@ DESCRIPTION
 
     -t          Output in Frequency Table
 '''
-
-import os
 from jjcli import *
 from collections import Counter
+
 
 __version__ = "0.0.1"
 
@@ -37,7 +36,7 @@ def tokenizer(content):
 
 def add_relative_freq(ocorr):
     total_ocorr = sum(item[1] for item in ocorr)
-    return {(word, n_ocorr, (n_ocorr/total_ocorr)*100) for word, n_ocorr in ocorr}
+    return {(palavra, n_ocorr, (n_ocorr/total_ocorr)*100) for palavra, n_ocorr in ocorr}
 
 
 def sort(ocorr, option):
@@ -53,27 +52,65 @@ def sort(ocorr, option):
 
 def printf(ocorr, option):
     ocorr = sort(ocorr, option)
-    for word, n_ocorr, relative_freq in ocorr:
-        print(f'{word:<{23}}  {n_ocorr:<{7}}  {relative_freq:.3f} %')
+    for palavra, n_ocorr, relative_freq in ocorr:
+        print(f'{palavra:<{23}}  {n_ocorr:<{7}}  {relative_freq:.3f} %')
 
 
 def ignore_case(ocorr):
     holder = {}
 
-    for word, n_ocorr in ocorr.items():
-        lower = word.lower()
+    for palavra, n_ocorr in ocorr.items():
+        lower = palavra.lower()
         if lower not in holder:
-            holder[lower] = (word,n_ocorr,n_ocorr)
+            holder[lower] = (palavra,n_ocorr,n_ocorr)
         elif n_ocorr > holder[lower][1]:
-            holder[lower] = (word,n_ocorr,n_ocorr+holder[lower][2])
+            holder[lower] = (palavra,n_ocorr,n_ocorr+holder[lower][2])
         else:
             holder[lower] = (holder[lower][0],holder[lower][1],n_ocorr+holder[lower][2])
 
-    return {word: total_ocorr for _, word, _, total_ocorr in holder.items()}
+    return {palavra: total_ocorr for _, palavra, _, total_ocorr in holder.items()}
 
 
 def check_substring(ocorr, substring):
     return filter(lambda item: substring in item[0], ocorr.items())
+
+
+def import_table():
+    table = {}
+    total = 0
+    db_file = open("data/frequency_table.txt","r")
+    pattern = re.compile('(\d+)\s+(\S+)')
+
+    for line in db_file:
+        match = pattern.match(line)
+        if match:
+            word = match.group(2)
+            n_ocorr = int(match.group(1))
+            total += n_ocorr
+            table[word] = n_ocorr
+
+    return table,total
+
+def compare(content):
+    
+    db,totalDb = import_table()
+    totalContent = 0
+    ratiosDict = {}
+
+    for _,occurrence in content:
+        totalContent += occurrence
+    
+    for (word,occurrence) in content:
+        if word in db:
+            relativeDb = db[word] / totalDb
+        else:
+            relativeDb = 1 / totalDb
+        
+        relativeContent = occurrence / totalContent
+        ratio = relativeContent / relativeDb
+        ratiosDict[word] = round(ratio,2)
+
+    return ratiosDict
 
 
 def generate_table(ocorr):
@@ -104,8 +141,8 @@ def generate_table(ocorr):
             <th>Palavra</th><th>Número de Ocorrências</th><th>Frequência Relativa</th>
         </tr>
 """
-    for word, n_ocorr, relative_freq in ocorr:
-        table += f"     <tr><td>{word}</td><td>{n_ocorr}</td><td>{relative_freq:.3f} %</td></tr>"
+    for palavra, n_ocorr, freq_relativa in ocorr:
+        table += f"     <tr><td>{palavra}</td><td>{n_ocorr}</td><td>{freq_relativa:.3f} %</td></tr>"
 
     table += """
     </table>
@@ -120,7 +157,7 @@ def generate_table(ocorr):
 
 
 def main():
-    cl = clfilter("adm:is:t", doc=__doc__)
+    cl = clfilter("adm:is:t:r", doc=__doc__)
 
     for txt in cl.text():
         print(cl.args)
@@ -139,6 +176,9 @@ def main():
             printf(check_substring(ocorr,cl.opt.get("-s")), 3)
         elif "-t" in cl.opt:
             generate_table(ocorr.items())
+        elif "-r" in cl.opt:
+            ocorr = compare(ocorr.items())
+            printf(ocorr.items(), 3)
         else:
             printf(ocorr.items(), 3)
             
