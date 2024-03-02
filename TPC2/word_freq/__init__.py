@@ -23,6 +23,7 @@ DESCRIPTION
 
     -t          Output in Frequency Table
 '''
+import os
 from jjcli import *
 from collections import Counter
 
@@ -31,162 +32,72 @@ __version__ = "0.0.1"
 
 def tokenizer(content):
     tokens = re.findall(r'\w+(?:\-\w+)?|[.,!_?;:—]+',content)
-    print(len(tokens))
     return tokens
 
-def add_relative_freq(ocorr):
-    total_ocorr = sum(item[1] for item in ocorr)
-    return {(palavra, n_ocorr, (n_ocorr/total_ocorr)*100) for palavra, n_ocorr in ocorr}
 
-
-def sort(ocorr, option):
-    ocorr = add_relative_freq(ocorr)
-    if option == 1:
-        ocorr = sorted(ocorr, key=lambda x: x[0])                     # Sorted by Ascending Alphabetical Order
-    elif option == 2:
-        ocorr = sorted(ocorr, key=lambda x: x[0], reverse=True)       # Sorted by Descending Alphabetical Order
-    elif option == 3:  
-        ocorr = sorted(ocorr, key=lambda x: x[1], reverse=True)       # Sorted by Number of Ocorrences
-    return ocorr
-
-
-def printf(ocorr, option):
-    ocorr = sort(ocorr, option)
-    for palavra, n_ocorr, relative_freq in ocorr:
-        print(f'{palavra:<{23}}  {n_ocorr:<{7}}  {relative_freq:.3f} %')
+def printf(ocorr):
+    for word, n_ocorr in ocorr:
+        print(f'{word:<{23}}  {n_ocorr:<{7}}')
 
 
 def ignore_case(ocorr):
     holder = {}
-
-    for palavra, n_ocorr in ocorr.items():
-        lower = palavra.lower()
+    for word, n_ocorr in ocorr.items():
+        lower = word.lower()
         if lower not in holder:
-            holder[lower] = (palavra,n_ocorr,n_ocorr)
+            holder[lower] = (word,n_ocorr,n_ocorr)
         elif n_ocorr > holder[lower][1]:
-            holder[lower] = (palavra,n_ocorr,n_ocorr+holder[lower][2])
+            holder[lower] = (word,n_ocorr,n_ocorr+holder[lower][2])
         else:
             holder[lower] = (holder[lower][0],holder[lower][1],n_ocorr+holder[lower][2])
-
-    return {palavra: total_ocorr for _, palavra, _, total_ocorr in holder.items()}
+    return {word: total_ocorr for _,(word,_,total_ocorr) in holder.items()}
 
 
 def check_substring(ocorr, substring):
-    return filter(lambda item: substring in item[0], ocorr.items())
+    filtered_words = filter(lambda item: substring in item[0], ocorr.items())
+    return {word: n_ocorr for word, n_ocorr in filtered_words}
 
 
-def import_table():
-    table = {}
-    total = 0
-    db_file = open("data/frequency_table.txt","r")
-    pattern = re.compile('(\d+)\s+(\S+)')
+def import_table(ocorr):
+    total_ocorr = ocorr.total()
+    with open(os.path.join(os.path.split(__file__)[0],"out.txt")) as file:
+        stdvals = {}
+        for line in file:
+            value,expectedPerM = line.strip().split("   ")
+            if ocorr[value]!=0:
+                stdvals[value]=(total_ocorr*float(expectedPerM)) / 1000000
+    return stdvals
 
-    for line in db_file:
-        match = pattern.match(line)
-        if match:
-            word = match.group(2)
-            n_ocorr = int(match.group(1))
-            total += n_ocorr
-            table[word] = n_ocorr
 
-    return table,total
-
-def compare(content):
-    
-    db,totalDb = import_table()
-    totalContent = 0
-    ratiosDict = {}
-
-    for _,occurrence in content:
-        totalContent += occurrence
-    
-    for (word,occurrence) in content:
-        if word in db:
-            relativeDb = db[word] / totalDb
+def compare_ratios(ocorr):
+    expected = Counter(import_table(ocorr))
+    holder = {}
+    for word, n_ocorr in ocorr.items():
+        if expected[word]!=0:
+            holder[word] = ((n_ocorr-expected[word])/expected[word])*100
         else:
-            relativeDb = 1 / totalDb
-        
-        relativeContent = occurrence / totalContent
-        ratio = relativeContent / relativeDb
-        ratiosDict[word] = round(ratio,2)
-
-    return ratiosDict
-
-
-def generate_table(ocorr):
-    ocorr = sort(ocorr, 3)
-    
-    table = """
-<html>
-    <head>
-        <style>
-            table {
-                width: 30%;
-                margin: 20px auto;
-                border: #cacaca solid;
-            }
-            th, td {
-                padding: 6px;
-                text-align: center;
-                border-bottom: 1.5px solid #ddd;
-            }
-            th {
-                background-color: #cacaca;
-            }
-        </style>
-    </head>
-    <body>
-    <table>
-        <tr>
-            <th>Palavra</th><th>Número de Ocorrências</th><th>Frequência Relativa</th>
-        </tr>
-"""
-    for palavra, n_ocorr, freq_relativa in ocorr:
-        table += f"     <tr><td>{palavra}</td><td>{n_ocorr}</td><td>{freq_relativa:.3f} %</td></tr>"
-
-    table += """
-    </table>
-    </body>
-</html>"""
-    
-    #out_path = os.path.join(os.path.dirname(__file__), "output.html")
-    #print(os.path.dirname(__file__))
-    with open("output.html", 'w') as file:
-        file.write(table)
-
+            holder[word] = ((n_ocorr-0.0397)/0.0397)*100
+    return holder
 
 
 def main():
-    cl = clfilter("adm:is:t:r", doc=__doc__)
+    cl = clfilter("adm:is:tr", doc=__doc__)
 
     for txt in cl.text():
-        print(cl.args)
         words = tokenizer(txt)
         ocorr = Counter(words)
-    
+
+        if "-i" in cl.opt:
+            ocorr = ignore_case(ocorr)
+        if "-s" in cl.opt:
+            ocorr = check_substring(ocorr,cl.opt.get("-s"))
+        if "-t" in cl.opt:
+            ocorr = compare_ratios(ocorr)
+        ocorr = sorted(ocorr.items(), key=lambda x: x[1], reverse=True)       # Sorted by Number of Ocorrences
         if "-m" in cl.opt:
-            printf(ocorr.most_common(int(cl.opt.get("-m"))), 3)
-        elif "-a" in cl.opt:
-            printf(ocorr.items(), 1)
-        elif "-d" in cl.opt:
-            printf(ocorr.items(), 2)
-        elif "-i" in cl.opt:
-            printf(ignore_case(ocorr).items(), 1)
-        elif "-s" in cl.opt:
-            printf(check_substring(ocorr,cl.opt.get("-s")), 3)
-        elif "-t" in cl.opt:
-            generate_table(ocorr.items())
-        elif "-r" in cl.opt:
-            ocorr = compare(ocorr.items())
-            printf(ocorr.items(), 3)
-        else:
-            printf(ocorr.items(), 3)
-            
-
-## Arranjar uma tabela padrão de ocorrências do portugues - linguateca
-
-## Limpeza da tabela - cortar as palavras que ocorrem poucas vezes, tirar numeros 
-            
-## Comparar racios de palavras entre dois textos (através da frequencia relativa)
-            
-## Localização do output da tabela (caminho relativo), usar __file__
+            ocorr = ocorr[:(int(cl.opt.get("-m")))]
+        if "-a" in cl.opt:
+            ocorr = sorted(ocorr, key=lambda x: x[0])                         # Sorted by Ascending Alphabetical Order
+        if "-d" in cl.opt:
+            ocorr = sorted(ocorr, key=lambda x: x[0], reverse=True)           # Sorted by Descending Alphabetical Order
+        printf(ocorr)
