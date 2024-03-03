@@ -4,7 +4,7 @@ Gerador de templates de ficheiros de configuração para packages python
 
 #### Estratégia adotada
 
-São interpoladas as variáveis **author**, **email**, **project**, correspondentes às informações do autor e respetivo nome do package.
+São interpoladas as variáveis **author**, **email**, **project** e **dependencies** correspondentes às informações do autor e respetivo nome e lista de dependências do package.
 
 ###### 1º Opção
 
@@ -13,6 +13,10 @@ Indicação do valor das variáveis configuráveis através de flags
 - -n : Nome do Projeto
 - -a : Nome do Autor
 - -e : Email do Autor
+- -d : Lista das Dependências 
+
+Exemplo de utilização:
+```makepyproject -n template -a duarte -e duarte.g.parente@gmail.com -d jjcli,jinja2```
 
 ###### 2º Opção
 

@@ -4,7 +4,7 @@ NAME
     makepyproject - Python packages template generator
 
 SYNOPSIS
-    makepyproject [-n <name>] [-a <author>] [-e <email>]
+    makepyproject [-n <name>] [-a <author>] [-e <email>] [-d <dep1,dep2,dep3,...>]
     
 DESCRIPTION
     Generates a template configuration file and creates a 'pyproject.toml' with it.
@@ -14,6 +14,8 @@ DESCRIPTION
     -a      Author name to be added to configuration file
         
     -e      Email to be added to configuration file
+
+    -d 
 '''
 import jinja2, os, json
 from jjcli import *
@@ -57,20 +59,22 @@ def project_name(cl):
         vars["project"] = modes[0].replace(".py","")
 
 
+def project_dependencies(cl):
+    if "-d" in cl.opt:
+        vars["dependencies"] = (cl.opt.get("-d")).split(',')
+
+
 def readMetadata(cl):
     metadata = os.path.expanduser("~/.metadata.json")
-
+    if os.path.isfile(metadata):
+        with open(metadata) as f:
+                data = json.load(f)
+                vars["author"] = data.get("author", os.getlogin())
+                vars["email"] = data.get("email", "#FIXME@")
     if "-a" in cl.opt:
         vars["author"] = cl.opt.get("-a")
     if "-e" in cl.opt:
         vars["email"] = cl.opt.get("-e")
-    else:
-        metadata = os.path.expanduser("~/.metadata.json")
-        if os.path.isfile(metadata):
-            with open(metadata) as f:
-                data = json.load(f)
-                vars["author"] = data["author"]
-                vars["email"] = data["email"]
 
 
 def write_config_file():
@@ -84,7 +88,12 @@ def write_config_file():
 
 
 def main():
-    cl = clfilter("n:a:e:", doc=__doc__)
+    cl = clfilter("n:a:e:d:", doc=__doc__)
     project_name(cl)
+    project_dependencies(cl)
     readMetadata(cl)
-    write_config_file()   
+    write_config_file()
+
+
+if __name__ == "__main__":
+    main()
