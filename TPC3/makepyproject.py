@@ -15,7 +15,7 @@ DESCRIPTION
         
     -e      Email to be added to configuration file
 
-    -d 
+    -d      List of dependencies to be added to configuration file
 '''
 import jinja2, os, json
 from jjcli import *
