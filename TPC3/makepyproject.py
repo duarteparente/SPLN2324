@@ -39,11 +39,12 @@ name ="{{project}}"
 authors = [
     {name = "{{author}}", email = "{{email}}"},
 ]
+version = "0.0.1"
 classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 requires-python = ">=3.8"
-dynamic = ["version","description"]
+dynamic = ["description"]
 
 dependencies = {{dependencies}}
 
